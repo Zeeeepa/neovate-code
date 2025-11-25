@@ -1492,6 +1492,28 @@ export const providers: ProvidersMap = {
       return createCerebras({ apiKey })(name);
     },
   },
+  poe: {
+    id: 'poe',
+    env: ['POE_API_KEY'],
+    name: 'Poe',
+    api: 'https://api.poe.com/v1',
+    doc: 'https://poe.com',
+    models: {
+      'Claude-Opus-4.5': models['claude-4-opus'],
+      'Claude-Sonnet-4.5': models['claude-4-5-sonnet'],
+      'Gemini-3-Pro': models['gemini-3-pro-preview'],
+      'Gemini-2.5-Pro': models['gemini-2.5-pro'],
+      'Gemini-2.5-Flash': models['gemini-2.5-flash'],
+      'GPT-5.1': models['gpt-5.1'],
+      'GPT-5.1-Codex': models['gpt-5.1-codex'],
+      'Grok-4.1-Fast-Non-Reasoning': {
+        ...models['grok-4.1-fast'],
+        reasoning: false,
+      },
+      'Grok-4.1-Fast': models['grok-4.1-fast'],
+    },
+    createModel: defaultModelCreatorCompatible,
+  },
 };
 
 // value format: provider/model
