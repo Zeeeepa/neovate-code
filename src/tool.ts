@@ -281,6 +281,7 @@ export type ToolResult = {
 
 export function createTool<TSchema extends z.ZodTypeAny>(config: {
   name: string;
+  displayName?: string;
   description: string;
   parameters: TSchema;
   execute: (params: z.output<TSchema>) => Promise<ToolResult> | ToolResult;
@@ -295,6 +296,7 @@ export function createTool<TSchema extends z.ZodTypeAny>(config: {
 }): Tool<TSchema> {
   return {
     name: config.name,
+    displayName: config.displayName,
     description: config.description,
     getDescription: config.getDescription,
     parameters: config.parameters,
