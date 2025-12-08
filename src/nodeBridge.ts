@@ -23,6 +23,7 @@ import type { ApprovalCategory, ToolUse } from './tool';
 import { getFiles } from './utils/files';
 import { listDirectory } from './utils/list';
 import { randomUUID } from './utils/randomUUID';
+import { getCurrentBranch } from './worktree';
 
 type ModelData = Omit<Model, 'id' | 'cost'>;
 
@@ -759,6 +760,20 @@ class NodeHandlerRegistry {
             this.buildWorkspaceData(worktree, context, gitRoot),
           ),
         );
+
+        // add root workspace data
+        const rootBranch = await getCurrentBranch(gitRoot);
+        const rootWorkspaceData = await this.buildWorkspaceData(
+          {
+            name: rootBranch,
+            path: gitRoot,
+            branch: rootBranch,
+            isClean: true,
+          },
+          context,
+          gitRoot,
+        );
+        workspacesData.unshift(rootWorkspaceData);
 
         return {
           success: true,
