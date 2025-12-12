@@ -1,14 +1,12 @@
 import * as p from '@umijs/clack-prompts';
-import {
-  type ExecSyncOptionsWithStringEncoding,
-  execSync,
-} from 'child_process';
+import { execSync } from 'child_process';
 import clipboardy from 'clipboardy';
 import pc from 'picocolors';
 import type { Context } from '../context';
-import { query } from '../query';
-import * as logger from '../utils/logger';
 import { type ModelInfo, resolveModelWithContext } from '../model';
+import { query } from '../query';
+import { getStagedDiff, getStagedFileList } from '../utils/git';
+import * as logger from '../utils/logger';
 
 interface GenerateCommitMessageOpts {
   prompt: string;
@@ -217,7 +215,7 @@ export async function runCommit(context: Context) {
     }
   }
 
-  const diff = await getStagedDiff();
+  const diff = await getStagedDiff(context.cwd);
   if (diff.length === 0) {
     logger.logWarn(
       'No staged changes to commit. Use -s flag to stage all changes or manually stage files with git add.',
@@ -225,7 +223,7 @@ export async function runCommit(context: Context) {
     return;
   }
 
-  const fileList = await getStagedFileList();
+  const fileList = await getStagedFileList(context.cwd);
 
   let repoStyle = '';
   if (argv.followStyle) {
@@ -652,101 +650,6 @@ function checkCommitMessage(message: string, hasAiSuffix = false) {
   // }
   if (message.length === 0) {
     throw new Error('Commit message is empty');
-  }
-}
-
-async function getStagedFileList() {
-  try {
-    const fileList = execSync('git diff --cached --name-status', {
-      encoding: 'utf-8',
-    });
-    return fileList.trim();
-  } catch (error: any) {
-    return '';
-  }
-}
-
-/**
- * Get the staged diff while handling large files
- * - Excludes common lockfiles and large file types
- * - Limits diff size to prevent context overflow
- */
-async function getStagedDiff() {
-  // Exclude lockfiles and common large file types
-  const excludePatterns = [
-    ':!pnpm-lock.yaml',
-    ':!package-lock.json',
-    ':!yarn.lock',
-    ':!*.min.js',
-    ':!*.bundle.js',
-    ':!dist/**',
-    ':!build/**',
-    ':!*.gz',
-    ':!*.zip',
-    ':!*.tar',
-    ':!*.tgz',
-    ':!*.woff',
-    ':!*.woff2',
-    ':!*.ttf',
-    ':!*.png',
-    ':!*.jpg',
-    ':!*.jpeg',
-    ':!*.gif',
-    ':!*.ico',
-    ':!*.svg',
-    ':!*.pdf',
-  ].join(' ');
-
-  // Get the diff with exclusions
-  const execOptions: ExecSyncOptionsWithStringEncoding = {
-    maxBuffer: 100 * 1024 * 1024, // 100MB buffer
-    encoding: 'utf-8',
-  };
-
-  try {
-    const diff = execSync(
-      `git diff --cached -- ${excludePatterns}`,
-      execOptions,
-    );
-
-    // Limit diff size - 100KB is a reasonable limit for most LLM contexts
-    const MAX_DIFF_SIZE = 100 * 1024; // 100KB
-
-    if (diff.length > MAX_DIFF_SIZE) {
-      // If diff is too large, truncate and add a note
-      const truncatedDiff = diff.substring(0, MAX_DIFF_SIZE);
-      return (
-        truncatedDiff +
-        '\n\n[Diff truncated due to size. Total diff size: ' +
-        (diff.length / 1024).toFixed(2) +
-        'KB]'
-      );
-    }
-    return diff;
-  } catch (error: any) {
-    const errorMessage =
-      error.stderr?.toString() || error.message || 'Unknown error';
-
-    if (errorMessage.includes('bad revision')) {
-      throw new Error(
-        'Failed to get staged diff: Invalid Git revision or corrupt repository',
-      );
-    }
-
-    if (errorMessage.includes('fatal: not a git repository')) {
-      throw new Error('Not a Git repository');
-    }
-
-    if (
-      error.code === 'ENOBUFS' ||
-      errorMessage.includes('maxBuffer exceeded')
-    ) {
-      throw new Error(
-        'Staged changes are too large to process. Please commit smaller changes.',
-      );
-    }
-
-    throw new Error(`Failed to get staged diff: ${errorMessage}`);
   }
 }
 

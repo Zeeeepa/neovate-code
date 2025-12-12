@@ -1130,6 +1130,86 @@ class NodeHandlerRegistry {
       },
     );
 
+    this.messageBus.registerHandler('project.generateCommit', async (data) => {
+      const { cwd, language = 'English', systemPrompt, model } = data;
+      try {
+        const { getStagedDiff, getStagedFileList } = await import(
+          './utils/git'
+        );
+
+        // Fetch diff and fileList if not provided
+        const diff = data.diff ?? (await getStagedDiff(cwd));
+        const fileList = data.fileList ?? (await getStagedFileList(cwd));
+
+        // Return error if no staged changes
+        if (!diff || diff.length === 0) {
+          return {
+            success: false,
+            error: 'No staged changes to commit',
+          };
+        }
+
+        // Build user prompt with staged files and diffs
+        const userPrompt = `
+# Staged files:
+${fileList}
+
+# Diffs:
+${diff}
+        `.trim();
+
+        // Use custom system prompt or default
+        const finalSystemPrompt =
+          systemPrompt || createGenerateCommitSystemPrompt(language);
+
+        // Call utils.quickQuery with JSON schema for structured output
+        const result = await this.messageBus.messageHandlers.get(
+          'utils.quickQuery',
+        )?.({
+          cwd,
+          userPrompt,
+          systemPrompt: finalSystemPrompt,
+          model,
+          responseFormat: {
+            type: 'json',
+            schema: z.toJSONSchema(
+              z.object({
+                commitMessage: z.string(),
+                branchName: z.string(),
+                isBreakingChange: z.boolean(),
+                summary: z.string(),
+              }),
+            ),
+          },
+        });
+
+        if (!result?.success) {
+          return {
+            success: false,
+            error: result?.error || 'Failed to generate commit message',
+          };
+        }
+
+        // Parse the JSON response
+        const jsonResponse = JSON.parse(result.data.text);
+
+        return {
+          success: true,
+          data: {
+            commitMessage: jsonResponse.commitMessage,
+            branchName: jsonResponse.branchName,
+            isBreakingChange: jsonResponse.isBreakingChange,
+            summary: jsonResponse.summary,
+          },
+        };
+      } catch (error: any) {
+        return {
+          success: false,
+          error: error.message || 'Failed to generate commit',
+        };
+      }
+    });
+
     //////////////////////////////////////////////
     // git operations
     this.messageBus.registerHandler('git.clone', async (data) => {
@@ -2143,4 +2223,48 @@ function normalizeProviders(providers: ProvidersMap, context: Context) {
       };
     },
   );
+}
+
+function createGenerateCommitSystemPrompt(language: string) {
+  return `
+You are an expert software engineer that generates Git commit information based on provided diffs.
+
+Review the provided context and diffs which are about to be committed to a git repo.
+Analyze the changes carefully and generate a JSON response with the following fields:
+
+1. **commitMessage**: A one-line commit message following conventional commit format
+   - Format: <type>: <description>
+   - Types: fix, feat, build, chore, ci, docs, style, refactor, perf, test
+   - Use ${language} for the description
+   - Use imperative mood (e.g., "add feature" not "added feature")
+   - Do not exceed 72 characters
+   - Do not capitalize the first letter
+   - Do not end with a period
+
+2. **branchName**: A suggested Git branch name
+   - Format: <type>/<description> for conventional commits, or <description> for regular changes
+   - Use only lowercase letters, numbers, and hyphens
+   - Maximum 50 characters
+   - No leading or trailing hyphens
+
+3. **isBreakingChange**: Boolean indicating if this is a breaking change
+   - Set to true if the changes break backward compatibility
+   - Look for removed public APIs, changed function signatures, etc.
+
+4. **summary**: A brief 1-2 sentence summary of the changes
+   - Use ${language}
+   - Describe what was changed and why
+
+## Response Format
+
+Respond with valid JSON only, no additional text or markdown formatting.
+
+Example response:
+{
+  "commitMessage": "feat: add user authentication system",
+  "branchName": "feat/add-user-authentication",
+  "isBreakingChange": false,
+  "summary": "Added JWT-based authentication with login and logout endpoints."
+}
+  `.trim();
 }

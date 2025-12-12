@@ -1,3 +1,7 @@
+import {
+  type ExecSyncOptionsWithStringEncoding,
+  execSync,
+} from 'child_process';
 import { execFileNoThrow } from './execFileNoThrow';
 
 export async function getGitStatus(opts: { cwd: string }) {
@@ -263,6 +267,21 @@ export async function getPendingChanges(cwd: string): Promise<string[]> {
       .map((line) => line.substring(3).trim());
   } catch {
     return [];
+  }
+}
+
+/**
+ * Get staged file list with status
+ */
+export async function getStagedFileList(cwd: string): Promise<string> {
+  try {
+    const fileList = execSync('git diff --cached --name-status', {
+      encoding: 'utf-8',
+      cwd,
+    });
+    return fileList.trim();
+  } catch {
+    return '';
   }
 }
 
@@ -773,5 +792,90 @@ export async function cloneRepository(
       error: 'Failed to clone repository. Please check the URL and try again.',
       errorCode: 'UNKNOWN',
     };
+  }
+}
+
+/**
+ * Get the staged diff while handling large files
+ * - Excludes common lockfiles and large file types
+ * - Limits diff size to prevent context overflow
+ */
+export async function getStagedDiff(cwd: string): Promise<string> {
+  // Exclude lockfiles and common large file types
+  const excludePatterns = [
+    ':!pnpm-lock.yaml',
+    ':!package-lock.json',
+    ':!yarn.lock',
+    ':!*.min.js',
+    ':!*.bundle.js',
+    ':!dist/**',
+    ':!build/**',
+    ':!*.gz',
+    ':!*.zip',
+    ':!*.tar',
+    ':!*.tgz',
+    ':!*.woff',
+    ':!*.woff2',
+    ':!*.ttf',
+    ':!*.png',
+    ':!*.jpg',
+    ':!*.jpeg',
+    ':!*.gif',
+    ':!*.ico',
+    ':!*.svg',
+    ':!*.pdf',
+  ].join(' ');
+
+  // Get the diff with exclusions
+  const execOptions: ExecSyncOptionsWithStringEncoding = {
+    maxBuffer: 100 * 1024 * 1024, // 100MB buffer
+    encoding: 'utf-8',
+    cwd,
+  };
+
+  try {
+    const diff = execSync(
+      `git diff --cached -- ${excludePatterns}`,
+      execOptions,
+    );
+
+    // Limit diff size - 100KB is a reasonable limit for most LLM contexts
+    const MAX_DIFF_SIZE = 100 * 1024; // 100KB
+
+    if (diff.length > MAX_DIFF_SIZE) {
+      // If diff is too large, truncate and add a note
+      const truncatedDiff = diff.substring(0, MAX_DIFF_SIZE);
+      return (
+        truncatedDiff +
+        '\n\n[Diff truncated due to size. Total diff size: ' +
+        (diff.length / 1024).toFixed(2) +
+        'KB]'
+      );
+    }
+    return diff;
+  } catch (error: any) {
+    const errorMessage =
+      error.stderr?.toString() || error.message || 'Unknown error';
+
+    if (errorMessage.includes('bad revision')) {
+      throw new Error(
+        'Failed to get staged diff: Invalid Git revision or corrupt repository',
+      );
+    }
+
+    if (errorMessage.includes('fatal: not a git repository')) {
+      throw new Error('Not a Git repository');
+    }
+
+    if (
+      error.code === 'ENOBUFS' ||
+      errorMessage.includes('maxBuffer exceeded')
+    ) {
+      throw new Error(
+        'Staged changes are too large to process. Please commit smaller changes.',
+      );
+    }
+
+    throw new Error(`Failed to get staged diff: ${errorMessage}`);
   }
 }

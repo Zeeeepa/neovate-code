@@ -355,6 +355,26 @@ type ProjectWorkspacesCreateGithubPROutput = {
   data?: { prUrl: string; prNumber: number };
 };
 
+type ProjectGenerateCommitInput = {
+  cwd: string;
+  language?: string; // defaults to 'English'
+  systemPrompt?: string; // custom system prompt override
+  model?: string; // passed to quickQuery
+  diff?: string; // git diff, fetched if not provided
+  fileList?: string; // staged file list, fetched if not provided
+};
+
+type ProjectGenerateCommitOutput = {
+  success: boolean;
+  error?: string;
+  data?: {
+    commitMessage: string;
+    branchName: string;
+    isBreakingChange: boolean;
+    summary: string;
+  };
+};
+
 // ============================================================================
 // Providers Handlers
 // ============================================================================
@@ -836,6 +856,10 @@ export type HandlerMap = {
   'project.workspaces.createGithubPR': {
     input: ProjectWorkspacesCreateGithubPRInput;
     output: ProjectWorkspacesCreateGithubPROutput;
+  };
+  'project.generateCommit': {
+    input: ProjectGenerateCommitInput;
+    output: ProjectGenerateCommitOutput;
   };
 
   // Providers handlers
