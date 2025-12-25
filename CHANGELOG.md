@@ -1,3 +1,15 @@
+## 0.22.3
+
+`2025-12-25`
+
+- feat: add model middleware support and new provider models by [@sorrycc](https://github.com/sorrycc)
+- feat: add streaming output for subAgent in quiet mode by [@阿平](https://github.com/阿平) in [#562](https://github.com/umijs/takumi/pull/562)
+- feat: add quote-aware command substitution detection by [@sorrycc](https://github.com/sorrycc)
+- feat: add minimax-m2.1 model and update provider configuration by @chencheng (云谦) in [#564](https://github.com/umijs/takumi/pull/564)
+- feat: add huggingface provider support by @chencheng (云谦) in [#563](https://github.com/umijs/takumi/pull/563)
+- feat: implement subagent system with explore agent and task tool by [@阿平](https://github.com/阿平) in [#556](https://github.com/umijs/takumi/pull/556)
+
+
 ## 0.22.2
 
 `2025-12-23`
