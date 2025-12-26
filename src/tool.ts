@@ -375,4 +375,5 @@ export type ToolApprovalResult =
   | {
       approved: boolean;
       params?: ToolParams;
+      denyReason?: string;
     };

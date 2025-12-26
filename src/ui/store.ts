@@ -202,7 +202,11 @@ interface AppActions {
   }: {
     toolUse: ToolUse;
     category?: ApprovalCategory;
-  }) => Promise<{ approved: boolean; params?: Record<string, unknown> }>;
+  }) => Promise<{
+    approved: boolean;
+    params?: Record<string, unknown>;
+    denyReason?: string;
+  }>;
   showMemoryModal: (rule: string) => Promise<'project' | 'global' | null>;
   addToQueue: (message: string) => void;
   clearQueue: () => void;
@@ -1003,6 +1007,7 @@ export const useAppStore = create<AppStore>()(
         return new Promise<{
           approved: boolean;
           params?: Record<string, unknown>;
+          denyReason?: string;
         }>((resolve) => {
           set({
             approvalModal: {
@@ -1014,6 +1019,12 @@ export const useAppStore = create<AppStore>()(
               ) => {
                 set({ approvalModal: null });
                 const isApproved = result !== 'deny';
+
+                // Handle denial reason if it exists
+                if (result === 'deny' && params?.denyReason) {
+                  get().log(`Tool denied with reason: ${params.denyReason}`);
+                }
+
                 if (result === 'approve_always_edit') {
                   await bridge.request('session.config.setApprovalMode', {
                     cwd,
@@ -1027,9 +1038,18 @@ export const useAppStore = create<AppStore>()(
                     approvalTool: toolUse.name,
                   });
                 }
+
+                // Extract denyReason
+                let denyReason: string | undefined;
+
+                if (!isApproved && params?.denyReason) {
+                  denyReason = params.denyReason as string;
+                }
+
                 resolve({
                   approved: isApproved,
                   params: isApproved ? params : undefined,
+                  denyReason,
                 });
               },
             },
