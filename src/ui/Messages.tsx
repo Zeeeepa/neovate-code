@@ -438,12 +438,14 @@ function ToolUse({ part }: { part: ToolUsePart }) {
   const description = part.description;
   return (
     <Box marginTop={SPACING.MESSAGE_MARGIN_TOP}>
-      <Text bold color={UI_COLORS.TOOL}>
-        {displayName || name}
+      <Text>
+        <Text bold color={UI_COLORS.TOOL}>
+          {displayName || name}
+        </Text>
+        {description && (
+          <Text color={UI_COLORS.TOOL_DESCRIPTION}>({description})</Text>
+        )}
       </Text>
-      {description && (
-        <Text color={UI_COLORS.TOOL_DESCRIPTION}>({description})</Text>
-      )}
     </Box>
   );
 }
