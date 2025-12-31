@@ -2073,7 +2073,7 @@ export async function resolveModel(
   );
   model.id = modelId;
   const mCreator = async () => {
-    let m: LanguageModelV2 | Promise<LanguageModelV2> = provider.createModel(
+    let m: LanguageModelV2 | Promise<LanguageModelV2> = provider.createModel!(
       modelId,
       provider,
       {
